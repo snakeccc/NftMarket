@@ -36,3 +36,14 @@
     transform: rotate(360deg);
   }
 }
+
+body {
+  background-color: #f8f9fa;
+}
+
+.navbar-brand,
+.nav-link,
+.navbar-text {
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  text-shadow: 2px 2px 5px rgba(0, 0, 0, 0.3);
+}

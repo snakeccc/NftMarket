@@ -1,8 +1,14 @@
 import { useState } from "react";
 import { ethers } from "ethers";
 import { Row, Form, Button } from "react-bootstrap";
-import { create as ipfsHttpClient } from "ipfs-http-client";
-const client = ipfsHttpClient("http://127.0.0.1:5001/api/v0");
+import { Storage } from "@google-cloud/storage";
+
+const storage = new Storage({
+  projectId: "global-tine-266521",
+  keyFilename: "../../../global-tine-266521-97d0e20d02aa.json",
+});
+
+const bucketName = "your-bucket-name";
 
 const Create = ({ marketplace, nft }) => {
   const [image, setImage] = useState("");
@@ -10,16 +16,27 @@ const Create = ({ marketplace, nft }) => {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
 
-  const uploadToIPFS = async (event) => {
+  const uploadToGCS = async (event) => {
     event.preventDefault();
     const file = event.target.files[0];
     if (typeof file !== "undefined") {
       try {
-        const result = await client.add(file);
-        console.log(result);
-        setImage(`https://dweb.link/ipfs/${result.path}`);
+        const bucket = storage.bucket(bucketName);
+        const blob = bucket.file(file.name);
+        const blobStream = blob.createWriteStream();
+
+        blobStream.on("error", (err) => {
+          console.log("Error uploading file to Google Cloud Storage:", err);
+        });
+
+        blobStream.on("finish", () => {
+          console.log(`File ${file.name} uploaded to Google Cloud Storage.`);
+          setImage(`https://storage.googleapis.com/${bucketName}/${file.name}`);
+        });
+
+        blobStream.end(file.buffer);
       } catch (error) {
-        console.log("ipfs image upload error: ", error);
+        console.log("Error uploading file to Google Cloud Storage:", error);
       }
     }
   };
@@ -27,16 +44,17 @@ const Create = ({ marketplace, nft }) => {
   const createNFT = async () => {
     if (!image || !price || !name || !description) return;
     try {
-      const result = await client.add(
-        JSON.stringify({ image, price, name, description })
-      );
-      mintThenList(result);
+      const result = await storage
+        .bucket(bucketName)
+        .upload(JSON.stringify({ image, price, name, description }));
+      const uri = `https://storage.googleapis.com/${bucketName}/${result[0].name}`;
+      mintThenList(uri);
     } catch (error) {
-      console.log("ipfs uri upload error: ", error);
+      console.log("Error uploading JSON file to Google Cloud Storage:", error);
     }
   };
-  const mintThenList = async (result) => {
-    const uri = `https://dweb.link/ipfs/${result.path}`;
+
+  const mintThenList = async (uri) => {
     // mint nft
     await (await nft.mint(uri)).wait();
     // get tokenId of new nft
@@ -47,6 +65,7 @@ const Create = ({ marketplace, nft }) => {
     const listingPrice = ethers.utils.parseEther(price.toString());
     await (await marketplace.makeItem(nft.address, id, listingPrice)).wait();
   };
+
   return (
     <div className="container-fluid mt-5">
       <div className="row">
@@ -61,7 +80,7 @@ const Create = ({ marketplace, nft }) => {
                 type="file"
                 required
                 name="file"
-                onChange={uploadToIPFS}
+                onChange={uploadToGCS}
               />
               <Form.Control
                 onChange={(e) => setName(e.target.value)}
@@ -97,4 +116,4 @@ const Create = ({ marketplace, nft }) => {
   );
 };
 
-export default Create;
+export default CreateToGoogle;
