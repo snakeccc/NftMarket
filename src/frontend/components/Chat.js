@@ -1,63 +1,71 @@
-import React, { useState } from "react";
-import openai from "openai";
-
+import React, { useState, useEffect } from "react";
+import axios from "axios";
 const Chat = () => {
+  const [input, setInput] = useState("");
   const [messages, setMessages] = useState([]);
-  const [inputValue, setInputValue] = useState("");
 
-  const askGpt = async (question) => {
-    const response = await openai.complete({
-      engine: "text-davinci-002",
-      prompt: `Q: ${question}\nA:`,
-      maxTokens: 100,
-      n: 1,
-      stop: "\n",
-    });
+  useEffect(() => {
+    const fetchData = async () => {
+      const response = await axios.post(
+        "https://api.openai.com/v1/engine/davinci-codex/completions",
+        {
+          prompt: "Hello, I am a chatbot. How can I assist you today?",
+          max_tokens: 150,
+          n: 1,
+          stop: "\n",
+          temperature: 0.7,
+        },
+        {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+          },
+        }
+      );
+      setMessages([...messages, response.data.choices[0].text]);
+    };
+    fetchData();
+  }, []);
 
-    return response.data.choices[0].text.trim();
-  };
-
-  const handleKeyDown = async (event) => {
-    if (event.key === "Enter" && inputValue !== "") {
-      const newMessage = {
-        text: inputValue,
-        isUser: true,
-      };
-      setMessages((prevMessages) => [...prevMessages, newMessage]);
-
-      const answer = await askGpt(inputValue);
-
-      const botMessage = {
-        text: answer,
-        isUser: false,
-      };
-      setMessages((prevMessages) => [...prevMessages, botMessage]);
-
-      setInputValue("");
-    }
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    const response = await axios.post(
+      "https://api.openai.com/v1/engine/davinci-codex/completions",
+      {
+        prompt: input,
+        max_tokens: 150,
+        n: 1,
+        stop: "\n",
+        temperature: 0.7,
+      },
+      {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${process.env.REACT_APP_OPENAI_API_KEY}`,
+        },
+      }
+    );
+    setMessages([...messages, input, response.data.choices[0].text]);
+    setInput("");
+    console.log(process.env.REACT_APP_OPENAI_API_KEY);
   };
 
   return (
     <div>
-      <div className="chat-window">
+      <h1>Chat</h1>
+      <div>
         {messages.map((message, index) => (
-          <div
-            key={index}
-            className={`message ${
-              message.isUser ? "user-message" : "bot-message"
-            }`}
-          >
-            {message.text}
-          </div>
+          <p key={index}>{message}</p>
         ))}
       </div>
-      <input
-        type="text"
-        placeholder="Type your message and press Enter"
-        value={inputValue}
-        onChange={(event) => setInputValue(event.target.value)}
-        onKeyDown={handleKeyDown}
-      />
+      <form onSubmit={handleSubmit}>
+        <input
+          type="text"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+        />
+        <button type="submit">Send</button>
+      </form>
     </div>
   );
 };
